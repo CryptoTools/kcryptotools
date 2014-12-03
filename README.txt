@@ -22,11 +22,11 @@ This will connect to crypto nodes and broadcast the transactions in hex. Note th
 
 KNOWN ISSUES:
 
-please submit any issues you found at https://github.com/kaykurokawa/kcryptotools/issues
+Please submit any issues you find at https://github.com/kaykurokawa/kcryptotools/issues
 
 TODO LIST: 
 
-add functionality to be able to add new tx while running peersockets  
+Add functionality to be able to add new tx while running peersockets  
 
 
 

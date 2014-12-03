@@ -9,11 +9,12 @@ import time
 from hashlib import sha256
 
 MSGHEADER_SIZE=24
-USER_AGENT='/BTCONNECT:0001/' #BIP 14
+USER_AGENT='/KCRYPTOTOOLS:0001/' #BIP 14
 TCP_RECV_PACKET_SIZE=4096
 SOCKET_BLOCK_SECONDS=0 #None means blocking calls, 0 means non blocking calls
 ADDRESS_TO_GET_IP='google.com' #connect to this address, in order to retreive computer IP
 NONCE = 1 
+MAX_PEERS=256 #max number of peers 
 
 # Handle multiple peer sockets
 class PeerSocketsHandler(object):
@@ -42,8 +43,6 @@ class PeerSocketsHandler(object):
         s.connect((ADDRESS_TO_GET_IP,80))
         out= s.getsockname()[0]
         s.close()
-        #for connecting to bitcoind on same machine
-        #out= socket.gethostbyname(socket.gethostname())
         return out
 
     #create new peer socket at address
@@ -120,8 +119,11 @@ class PeerSocketsHandler(object):
                 #check new addresses we got from the peer and try to connect 
                 while len(current_peer.peer_address_list) > 0 :
                     address=current_peer.peer_address_list.pop()
-                    if( self.peer_memdb.is_closed(address)):
-                        self.create_peer_socket(address)
+                    if self.peer_memdb.is_closed(address):
+                        if self.get_num_peers() >= MAX_PEERS:
+                            print("max peers exceeded")
+                        else:
+                            self.create_peer_socket(address)
                     else:
                         print("found already connected peer")
                 #check new tx and add to db 
@@ -272,8 +274,6 @@ class PeerSocket(object):
     def _send_tx(self,tx_hash):
         # send only if we have tx_hash 
         if tx_hash in self.broadcast_tx_dict:
-
-            print("send_tx initialized")
             data=self.broadcast_tx_dict[tx_hash]
             self._send_packet('tx',data)
        
