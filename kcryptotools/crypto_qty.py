@@ -6,11 +6,11 @@
 #
 
 def _cryptoDecimalPlace(crypto_name):
-    if crypto_name.lower() == 'btc' or crypto_name.lower()== 'btc_testnet':
+    if crypto_name.lower() in ['bitcoin', 'btc','btc_testnet']:
         return 8 
-    elif crypto_name.lower() == 'doge' or crypto_name.lower()=='doge_testnet':
+    elif crypto_name.lower() in ['dogecoin','doge','doge_testnet']:
         return 8
-    elif crypto_name.lower() == 'ltc' or crypto_name.lower()=='ltc_testnet': 
+    elif crypto_name.lower() in ['litecoin','ltc','ltc_testnet']:
         return 8
 
 # Converstion between qty and float is obviously not reliable, 
