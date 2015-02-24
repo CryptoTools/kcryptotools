@@ -15,6 +15,7 @@ SOCKET_BLOCK_SECONDS=0 #None means blocking calls, 0 means non blocking calls
 ADDRESS_TO_GET_IP='google.com' #connect to this address, in order to retreive computer IP
 NONCE = 1 
 MAX_PEERS=256 #max number of peers 
+NUM_TX_BROADCASTS=20 #number of peers to broadcast tx to 
 
 # Handle multiple peer sockets
 class PeerSocketsHandler(object):
@@ -31,7 +32,9 @@ class PeerSocketsHandler(object):
         self.poller =select.poll()
         self.fileno_to_peer_dict={}
         self.tx_dict={} #dict of received transcations, key = hash , value=tuple(timestamp first recieved,address)
-        self.tx_broadcast_list=tx_broadcast_list #list of tx to broadcast          
+        self.tx_broadcast_list=[]
+        for tx in tx_broadcast_list: 
+            self.tx_broadcast_list.append((tx,0))
 
     def __del__(self):
         self.peer_memdb.dump_to_disk()
@@ -47,7 +50,6 @@ class PeerSocketsHandler(object):
 
     #create new peer socket at address
     def create_peer_socket(self,address):
-
         print("establishing connection to:",address)
         # check if address is domain name and convert it to TCP IP address
         if any([ c.isalpha() for c in address]):
@@ -85,10 +87,27 @@ class PeerSocketsHandler(object):
         for peer in self.fileno_to_peer_dict.values():
             if peer.get_is_active():
                 out+=1
-        return out 
+        return out
+
+    def add_new_broadcast_tx(self,tx):
+        self.broadcast_list.append((tx,0)) 
+
     # poll peer sockets and do stuff if there is data
     def run(self): 
         events=self.poller.poll()
+
+        #broadcast tx 
+        active_peer_list=[peer for peer in self.fileno_to_peer_dict.values() if peer.get_is_active()]
+        for current_peer in active_peer_list:
+            for (i,(tx,num_broadcasts)) in enumerate(self.tx_broadcast_list):
+                was_broadcast=current_peer.broadcast(tx)# this will not broadcast more than once
+                if was_broadcast:
+                    print("Tx has been broadcast: {}".format(tx))
+                    self.tx_broadcast_list[i]=(tx,num_broadcasts+1)
+
+        # remove tx after we broadcast NUM_TX_BROADCASTS times
+        self.tx_broadcast_list=[x for x in self.tx_broadcast_list if x[1] < NUM_TX_BROADCASTS]
+                  
         for event in events:
             poll_result=event[1]
             fileno=event[0]
@@ -107,11 +126,6 @@ class PeerSocketsHandler(object):
                     current_peer.set_is_active(True)
                     print("Sent version")
                     print("active peers:",self.get_num_active_peers())
-                # broadcast tx 
-                for tx in self.tx_broadcast_list:
-                    was_broadcast=current_peer.broadcast(tx)# this will not broadcast more than once
-                    if was_broadcast:
-                        print("Tx has been broadcast: {}".format(tx))
 
             if(poll_result & select.POLLIN):#ready for read( packet is available)
                 current_peer.recv()
