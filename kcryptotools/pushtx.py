@@ -26,7 +26,6 @@ def main():
 
     if len(sys.argv) < 3:
         raise Excpetion("invalid arguments")
-
     crypto              = sys.argv[1].lower()
     num_peers_to_send   = int(sys.argv[2])
     tx_list=[]

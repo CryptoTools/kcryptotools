@@ -24,7 +24,6 @@ class PeerSocketsHandler(object):
     # in hex string (i.e, '03afb8..')
     def __init__(self,crypto,tx_broadcast_list=[]):
         self.crypto=crypto
-
         self.peer_memdb=peerdb.PeerMemDB()
         self.tx_memdb=peerdb.TxMemDB()
 
@@ -90,7 +89,7 @@ class PeerSocketsHandler(object):
         return out
 
     def add_new_broadcast_tx(self,tx):
-        self.broadcast_list.append((tx,0)) 
+        self.tx_broadcast_list.append((tx,0)) 
 
     # poll peer sockets and do stuff if there is data
     def run(self): 
