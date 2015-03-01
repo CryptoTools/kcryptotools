@@ -70,10 +70,10 @@ class Handler(SocketServer.BaseRequestHandler):
                 return 
             else:
                 handler.add_new_broadcast_tx(msg) 
- 
+                socketsend(self.request,'ack')  
 def main():
     if len(sys.argv) < 2:
-        raise Exception("invalid arguments")
+        raise Exception("invalid arguments, requires crypto as argument")
 
     crypto              = sys.argv[1].lower()
     
