@@ -35,6 +35,9 @@ class PeerSocketsHandler(object):
         for tx in tx_broadcast_list: 
             self.tx_broadcast_list.append((tx,0))
 
+        for address in cryptoconfig.DNS_SEEDS[self.crypto]:
+            self.create_peer_socket(address)
+
     # function to get my current ip, 
     def _get_my_ip(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -128,9 +131,7 @@ class PeerSocketsHandler(object):
                 while len(current_peer.peer_address_list) > 0 :
                     address=current_peer.peer_address_list.pop()
                     if address not in self.address_to_peer_dict:
-                        if self.get_num_peers() >= self.max_peers:
-                            print("max peers exceeded")
-                        else:
+                        if self.get_num_peers() < self.max_peers: 
                             self.create_peer_socket(address)
                     else:
                         print("found already connected peer")

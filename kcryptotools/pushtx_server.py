@@ -57,27 +57,25 @@ class Handler(SocketServer.BaseRequestHandler):
         SocketServer.BaseRequestHandler.__init__(self,request,client_address,server) 
 
     def handle(self):
-        crypto='bitcoin'
-        handler=peersockets.PeerSocketsHandler(crypto)
-        for address in cryptoconfig.DNS_SEEDS[crypto]:
-            handler.create_peer_socket(address)
-
-        while 1:
-            handler.run()
+         while 1:
+            self.server.handler.run()
             msg=socketrecv(self.request,pushtx_server_config.BUFFER_SIZE)
             out_json={}
             if msg==None:
                 return 
             else:
-                handler.add_new_broadcast_tx(msg) 
+                self.server.handler.add_new_broadcast_tx(msg) 
                 socketsend(self.request,'ack')  
 def main():
     if len(sys.argv) < 2:
         raise Exception("invalid arguments, requires crypto as argument")
 
-    crypto              = sys.argv[1].lower()
-    
+    crypto = sys.argv[1].lower()
+    handler=peersockets.PeerSocketsHandler(crypto)
+
+  
     server=SocketServer.TCPServer( ("localhost",pushtx_server_config.SERVER_PORT),Handler)
+    server.handler = handler
     server.serve_forever()
 
 if __name__ == "__main__":
