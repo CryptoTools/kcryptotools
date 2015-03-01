@@ -7,22 +7,24 @@ import select
 import time
 from hashlib import sha256
 
-MSGHEADER_SIZE=24
 USER_AGENT='/KCRYPTOTOOLS:0001/' #BIP 14
 TCP_RECV_PACKET_SIZE=4096
 SOCKET_BLOCK_SECONDS=0 #None means blocking calls, 0 means non blocking calls
 ADDRESS_TO_GET_IP='google.com' #connect to this address, in order to retreive computer IP
 NONCE = 1 
-MAX_PEERS=256 #max number of peers 
-NUM_TX_BROADCASTS=20 #number of peers to broadcast tx to 
+DEFAULT_MAX_PEERS=256 #max number of peers 
+DEFAULT_NUM_TX_BROADCASTS=20 #number of peers to broadcast tx to 
 
 # Handle multiple peer sockets
 class PeerSocketsHandler(object):
     
     # tx_broadcast_list is a list of transactions to be broadcast 
     # in hex string (i.e, '03afb8..')
-    def __init__(self,crypto,tx_broadcast_list=[]):
+    def __init__(self,crypto,tx_broadcast_list=[],max_peers=DEFAULT_MAX_PEERS,
+                    num_tx_broadcasts=DEFAULT_NUM_TX_BROADCASTS):
         self.crypto=crypto
+        self.max_peers=MAX_PEERS
+        self.num_tx_broadcasts=NUM_TX_BROADCASTS
 
         self.my_ip=self._get_my_ip()
         self.poller =select.poll()
@@ -32,9 +34,6 @@ class PeerSocketsHandler(object):
         self.tx_broadcast_list=[]
         for tx in tx_broadcast_list: 
             self.tx_broadcast_list.append((tx,0))
-
-    def __del__(self):
-        self.peer_memdb.dump_to_disk()
 
     # function to get my current ip, 
     def _get_my_ip(self):
@@ -102,7 +101,7 @@ class PeerSocketsHandler(object):
                     self.tx_broadcast_list[i]=(tx,num_broadcasts+1)
 
         # remove tx after we broadcast NUM_TX_BROADCASTS times
-        self.tx_broadcast_list=[x for x in self.tx_broadcast_list if x[1] < NUM_TX_BROADCASTS]
+        self.tx_broadcast_list=[x for x in self.tx_broadcast_list if x[1] < self.num_tx_broadcasts]
                   
         for event in events:
             poll_result=event[1]
@@ -129,7 +128,7 @@ class PeerSocketsHandler(object):
                 while len(current_peer.peer_address_list) > 0 :
                     address=current_peer.peer_address_list.pop()
                     if address not in self.address_to_peer_dict:
-                        if self.get_num_peers() >= MAX_PEERS:
+                        if self.get_num_peers() >= self.max_peers:
                             print("max peers exceeded")
                         else:
                             self.create_peer_socket(address)
@@ -208,9 +207,9 @@ class PeerSocket(object):
   
     def get_packet(self):
 
-        if( len(self.recv_buffer) >= MSGHEADER_SIZE):
+        if( len(self.recv_buffer) >= protocol.MSGHEADER_SIZE):
             data_length=protocol.get_length_msgheader(self.recv_buffer)
-            self.expected_msg_size=data_length+MSGHEADER_SIZE
+            self.expected_msg_size=data_length+protocol.MSGHEADER_SIZE
             #if valid command is not contained, packet will be thrown out 
             if protocol.is_valid_command(self.recv_buffer)==False:
                 print('Invalid command:',protocol.get_command_msgheader(self.recv_buffer))

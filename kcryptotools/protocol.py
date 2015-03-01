@@ -8,6 +8,7 @@ from hashlib import sha256
 VALID_COMMANDS=['getaddr','addr','inv','getblocks','headers','getheaders','getdata','notfound','block','tx','pong',
                 'ping','version','verack','reject']
 
+MSGHEADER_SIZE=24
 def is_valid_command(data):    
     out = any([compare_command(data,command) for command in VALID_COMMANDS])
     return out
