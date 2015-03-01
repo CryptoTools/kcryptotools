@@ -77,7 +77,8 @@ class BlockMemDB(object):
     def __init__(self):
         self.block_dict={} 
 
-# Stores Tx hash by address and earliest timestamp 
+# Stores Tx hash by address and earliest timestamp
+# Currently, not used
 class TxMemDB(object):
     def __init__(self):
         #dict where first key is address,second key is tx hash

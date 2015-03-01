@@ -1,6 +1,5 @@
 import protocol
 import cryptoconfig
-import peerdb
 
 import struct 
 import socket
@@ -24,11 +23,11 @@ class PeerSocketsHandler(object):
     # in hex string (i.e, '03afb8..')
     def __init__(self,crypto,tx_broadcast_list=[]):
         self.crypto=crypto
-        self.peer_memdb=peerdb.PeerMemDB()
 
         self.my_ip=self._get_my_ip()
         self.poller =select.poll()
         self.fileno_to_peer_dict={}
+        self.address_to_peer_dict={}
         self.tx_dict={} #dict of received transcations, key = hash , value=tuple(timestamp first recieved,address)
         self.tx_broadcast_list=[]
         for tx in tx_broadcast_list: 
@@ -63,7 +62,7 @@ class PeerSocketsHandler(object):
             print("could not connect to:",address)
             return False  
         self.fileno_to_peer_dict[peer.get_socket().fileno()]=peer 
-        self.peer_memdb.add_initialized_address(address)
+        self.address_to_peer_dict[address]=peer
         eventmask=select.POLLIN|select.POLLPRI|select.POLLOUT|select.POLLERR|select.POLLHUP|select.POLLNVAL
         self.poller.register( peer.get_socket().fileno(),eventmask)
         return True 
@@ -73,9 +72,9 @@ class PeerSocketsHandler(object):
         fileno=peer.get_socket().fileno()
         address=peer.get_address()
         self.poller.unregister(fileno)
-        self.peer_memdb.add_closed_address(address)
         del self.fileno_to_peer_dict[fileno]
-   
+        del self.address_to_peer_dict[address]
+
     def get_num_peers(self):
         return len(self.fileno_to_peer_dict)
 
@@ -111,7 +110,6 @@ class PeerSocketsHandler(object):
             current_peer=self.fileno_to_peer_dict[fileno]
             if(poll_result & select.POLLOUT): #ready for write (means socket is connected)
                 print(fileno," ready to write")
-                self.peer_memdb.add_opened_address(current_peer.get_address())
                 #don't check for POLLOUT anymore, since we know it is connected 
                 self.poller.modify(fileno,
                     select.POLLIN|select.POLLPRI|select.POLLERR|select.POLLHUP|select.POLLNVAL) 
@@ -130,14 +128,14 @@ class PeerSocketsHandler(object):
                 #check new addresses we got from the peer and try to connect 
                 while len(current_peer.peer_address_list) > 0 :
                     address=current_peer.peer_address_list.pop()
-                    if self.peer_memdb.is_closed(address):
+                    if address not in self.address_to_peer_dict:
                         if self.get_num_peers() >= MAX_PEERS:
                             print("max peers exceeded")
                         else:
                             self.create_peer_socket(address)
                     else:
                         print("found already connected peer")
-                #check new tx and add to db 
+                #check new tx and add to db, Currently this does nothing  
                 while len(current_peer.tx_hash_list) > 0 :
                     tx_hash=current_peer.tx_hash_list.pop()
 
