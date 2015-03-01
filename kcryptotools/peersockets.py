@@ -25,7 +25,6 @@ class PeerSocketsHandler(object):
     def __init__(self,crypto,tx_broadcast_list=[]):
         self.crypto=crypto
         self.peer_memdb=peerdb.PeerMemDB()
-        self.tx_memdb=peerdb.TxMemDB()
 
         self.my_ip=self._get_my_ip()
         self.poller =select.poll()
@@ -37,7 +36,6 @@ class PeerSocketsHandler(object):
 
     def __del__(self):
         self.peer_memdb.dump_to_disk()
-        self.tx_memdb.dump_to_disk()
 
     # function to get my current ip, 
     def _get_my_ip(self):
@@ -142,7 +140,6 @@ class PeerSocketsHandler(object):
                 #check new tx and add to db 
                 while len(current_peer.tx_hash_list) > 0 :
                     tx_hash=current_peer.tx_hash_list.pop()
-                    self.tx_memdb.add(current_peer.get_address(),tx_hash)
 
             if(poll_result & select.POLLPRI): #urgent data to read
                 print("URGENT READ")
