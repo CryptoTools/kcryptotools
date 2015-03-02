@@ -1,6 +1,7 @@
 import protocol
 import cryptoconfig
 
+import logging 
 import struct 
 import socket
 import select
@@ -12,9 +13,10 @@ TCP_RECV_PACKET_SIZE=4096
 SOCKET_BLOCK_SECONDS=0 #None means blocking calls, 0 means non blocking calls
 ADDRESS_TO_GET_IP='google.com' #connect to this address, in order to retreive computer IP
 NONCE = 1 
-DEFAULT_MAX_PEERS=256 #max number of peers 
+DEFAULT_MAX_PEERS=128 #max number of peers 
 DEFAULT_NUM_TX_BROADCASTS=20 #number of peers to broadcast tx to 
 MESSAGING_PORT=1944
+LOG_FILENAME='kcryptotools.log' 
 
 def socketrecv(conn,init_buffer_size):
     msg=conn.recv(init_buffer_size)
@@ -46,6 +48,8 @@ class PeerSocketsHandler(object):
     # in hex string (i.e, '03afb8..')
     def __init__(self,crypto,tx_broadcast_list=[],max_peers=DEFAULT_MAX_PEERS,
                     num_tx_broadcasts=DEFAULT_NUM_TX_BROADCASTS):
+
+        logging.basicConfig(filename=LOG_FILENAME, level=logging.INFO)
         self.crypto=crypto
         self.max_peers=DEFAULT_MAX_PEERS
         self.num_tx_broadcasts=DEFAULT_NUM_TX_BROADCASTS
@@ -88,14 +92,13 @@ class PeerSocketsHandler(object):
             try:
                 address=socket.gethostbyname(address)         
             except Exception as e:
-                print("failed to resolved address "+address)
+                logging.warn("failed to resolved address "+address)
                 return False 
         try:
             peer=PeerSocket(self.crypto)
             peer.connect(address)
         except IOError as e:
-            print ("I/O error({0}): {1}".format(e.errno, e.strerror))
-            print("could not connect to:",address)
+            logging.warn("I/O error({0}): {1}, could not connect to {}".format(e.errno, e.strerror,address))
             return False  
         self.fileno_to_peer_dict[peer.get_socket().fileno()]=peer 
         self.address_to_peer_dict[address]=peer
@@ -129,7 +132,6 @@ class PeerSocketsHandler(object):
             conn,addr=self.msg_socket.accept()
             msg=socketrecv(conn,TCP_RECV_PACKET_SIZE)
         except Exception as e:
-            #print str(e)
             msg=None
             
         if msg==None:
@@ -154,7 +156,7 @@ class PeerSocketsHandler(object):
             for (i,(tx,num_broadcasts)) in enumerate(self.tx_broadcast_list):
                 was_broadcast=current_peer.broadcast(tx)# this will not broadcast more than once
                 if was_broadcast:
-                    print("Tx has been broadcast: {}".format(tx))
+                    logging.info("Tx has been broadcast: {}".format(tx))
                     self.tx_broadcast_list[i]=(tx,num_broadcasts+1)
 
         # remove tx after we broadcast NUM_TX_BROADCASTS times
@@ -167,18 +169,16 @@ class PeerSocketsHandler(object):
             fileno=event[0]
             current_peer=self.fileno_to_peer_dict[fileno]
             if(poll_result & select.POLLOUT): #ready for write (means socket is connected)
-                print(fileno," ready to write")
                 #don't check for POLLOUT anymore, since we know it is connected 
                 self.poller.modify(fileno,
                     select.POLLIN|select.POLLPRI|select.POLLERR|select.POLLHUP|select.POLLNVAL) 
                 # initialize by sending version 
                 if not current_peer.get_is_active():
-                    print("connection established to",current_peer.address)
+                    logging.info("connection established to {}".format(current_peer.address))
                     current_peer.send_version(self.my_ip)
                     current_peer.send_getaddr()
                     current_peer.set_is_active(True)
-                    print("Sent version")
-                    print("active peers:",self.get_num_active_peers())
+                    logging.info("num active peers: {}".format(self.get_num_active_peers()))
 
             if(poll_result & select.POLLIN):#ready for read( packet is available)
                 current_peer.recv()
@@ -194,16 +194,14 @@ class PeerSocketsHandler(object):
                     tx_hash=current_peer.tx_hash_list.pop()
 
             if(poll_result & select.POLLPRI): #urgent data to read
-                print("URGENT READ")
+                pass
             if(poll_result & select.POLLERR): #Error condition
-                print("ERROR CONDITION on %d"%(fileno))
+                logging.info("Error condition detected on {}".format(current_peer.get_address()))
             if(poll_result & select.POLLHUP): #hung up
-                print("HUNG UP detected on %d"%(fileno))
-                print('valid bytes:', current_peer.total_valid_bytes_received,
-                    'junk bytes:',current_peer.total_junk_bytes_received)            
+                logging.info("Hung up detected on {}".format(current_peer.get_address()))
                 self.remove_peer_socket(current_peer)
             if(poll_result & select.POLLNVAL): #invalid request, unopen descriptor
-                print("INVALID REQUEST")
+                logging.info("Invalid request detected on {}".format(current_peer.get_address()))
                 self.remove_peer_socket(current_peer)
 
 class PeerSocket(object):
@@ -267,15 +265,15 @@ class PeerSocket(object):
             self.expected_msg_size=data_length+protocol.MSGHEADER_SIZE
             #if valid command is not contained, packet will be thrown out 
             if protocol.is_valid_command(self.recv_buffer)==False:
-                print('Invalid command:',protocol.get_command_msgheader(self.recv_buffer))
                 self.total_junk_bytes_received+=len(self.recv_buffer)
                 self.expected_msg_size=0
                 self.recv_buffer=''
+                logging.warn('Invalid command {} found'.format( protocol.get_command_msgheader(self.recv_buffer)))
                 return '' 
         try:
             self.recv_buffer+=self.my_socket.recv(TCP_RECV_PACKET_SIZE)
         except IOError as e:
-            print("I/O error({0}): {1}".format(e.errno, e.strerror))
+            logging.warn("I/O error({0}): {1}".format(e.errno, e.strerror))
             return ''  
 
         #if entire message is assembled exactly, return it
@@ -312,7 +310,7 @@ class PeerSocket(object):
         try:
             self.my_socket.send(packet)
         except IOError as e:
-            print("Send packet I/O error({0}): {1}".format(e.errno, e.strerror))
+            logging.warn("Send packet to {0} I/O error({1}): {2}".format(self.address,e.errno, e.strerror))
             return False
         return True
 
@@ -398,7 +396,7 @@ class PeerSocket(object):
         elif protocol.compare_command(data,"reject"): 
             pass
         else:
-            print("unhandled command recieved:",protocol.get_command_msgheader(data))
+            logging.error("unhandled command recieved:",protocol.get_command_msgheader(data))
 
     def _process_get_data(self,data):
         payload         =   protocol.get_payload(data)
@@ -419,7 +417,7 @@ class PeerSocket(object):
             elif(inv_type==2):#block
                 pass 
             else:
-                print("unknown inv")
+                logging.error("unknown inv {} found".format(inv_type))
 
     def _process_addr(self,data):
         payload         =   protocol.get_payload(data)
@@ -455,8 +453,7 @@ class PeerSocket(object):
             elif(inv_type==2):#block
                 self._process_inv_block(inv_hash)
             else:
-                print("unknown inv")
-
+                logging.error("unknown inv {} found".format(inv_type))
     def _process_inv_tx(self,inv_hash):
         self.tx_hash_list.append(inv_hash)
 
@@ -472,14 +469,14 @@ class PeerSocket(object):
     def _process_version_handshake(socket):
         data=socket.recv(1024)
         if(protocol.compare_command(data,"version")):
-            print("version message recieved")
+            logging.info("version message recieved")
         else:
-            print("unexpected message recieved")
+            logging.error("unexpected message recieved in version handshake")
         data=socket.recv(1024)
         out_tuple=struct.unpack('<I12c',data[0:16]) 
         if(protocol.compare_command(data,"verack")):
-            print("verack message recieved")
+            logging.info("verack message recieved")
         else: 
-            print("message type:",out_tuple[1:])
+            logging.info("message type:",out_tuple[1:])
 
 

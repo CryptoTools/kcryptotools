@@ -6,6 +6,7 @@
 
 import sys
 import json
+import socket
 
 import peersockets
 import pushtx_server
@@ -19,7 +20,7 @@ def _initclient(ip,port):
 
 
 def _communicate(ip,port,msg,recv_buffer_size):
-    s=initclient(ip,port)
+    s=_initclient(ip,port)
     peersockets.socketsend(s,msg)
     out=peersockets.socketrecv(s,recv_buffer_size)
     s.close()
