@@ -14,6 +14,30 @@ ADDRESS_TO_GET_IP='google.com' #connect to this address, in order to retreive co
 NONCE = 1 
 DEFAULT_MAX_PEERS=256 #max number of peers 
 DEFAULT_NUM_TX_BROADCASTS=20 #number of peers to broadcast tx to 
+MESSAGING_PORT=1944
+
+def socketrecv(conn,init_buffer_size):
+    msg=conn.recv(init_buffer_size)
+    # None will be received when socket is closed
+    if len(msg) == 0:
+        return None
+    expected_msg_len=struct.unpack('<H',msg[0:2])[0] #length of message in bytes,including this message length byte
+    if len(msg) < expected_msg_len:
+        while 1:
+            new_msg=conn.recv(expected_msg_len-len(msg))
+            msg+=new_msg
+            if len(msg) == expected_msg_len:
+                break                                
+    return msg[2:]
+
+def socketsend(conn,msg):
+    if len(msg) > 65536:
+        raise Exception('message length must be less than 16 bits')
+    msg_len=len(msg)+2
+
+    send_msg=struct.pack('<H',msg_len)+msg
+    conn.sendall(send_msg)
+
 
 # Handle multiple peer sockets
 class PeerSocketsHandler(object):
@@ -23,8 +47,8 @@ class PeerSocketsHandler(object):
     def __init__(self,crypto,tx_broadcast_list=[],max_peers=DEFAULT_MAX_PEERS,
                     num_tx_broadcasts=DEFAULT_NUM_TX_BROADCASTS):
         self.crypto=crypto
-        self.max_peers=MAX_PEERS
-        self.num_tx_broadcasts=NUM_TX_BROADCASTS
+        self.max_peers=DEFAULT_MAX_PEERS
+        self.num_tx_broadcasts=DEFAULT_NUM_TX_BROADCASTS
 
         self.my_ip=self._get_my_ip()
         self.poller =select.poll()
@@ -35,9 +59,20 @@ class PeerSocketsHandler(object):
         for tx in tx_broadcast_list: 
             self.tx_broadcast_list.append((tx,0))
 
+        # setup messaging socket 
+        self.msg_socket= socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.msg_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.msg_socket.bind(('localhost',MESSAGING_PORT))
+        self.msg_socket.listen(5)
+        self.msg_socket.settimeout(0) # non blocking
+        self.msg_recv_buffer=''
+
+
+        # connect to DNS seeds
         for address in cryptoconfig.DNS_SEEDS[self.crypto]:
             self.create_peer_socket(address)
 
+   
     # function to get my current ip, 
     def _get_my_ip(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -48,7 +83,6 @@ class PeerSocketsHandler(object):
 
     #create new peer socket at address
     def create_peer_socket(self,address):
-        print("establishing connection to:",address)
         # check if address is domain name and convert it to TCP IP address
         if any([ c.isalpha() for c in address]):
             try:
@@ -90,9 +124,29 @@ class PeerSocketsHandler(object):
     def add_new_broadcast_tx(self,tx):
         self.tx_broadcast_list.append((tx,0)) 
 
+    def _recv_msg(self):
+        try:
+            conn,addr=self.msg_socket.accept()
+            msg=socketrecv(conn,TCP_RECV_PACKET_SIZE)
+        except Exception as e:
+            #print str(e)
+            msg=None
+            
+        if msg==None:
+            return False
+        msg_list=msg.split()
+
+        if msg_list[0] == 'tx':
+            self.add_new_broadcast_tx(msg_list[1])
+            socketsend(conn,'ack')
+            return True
+        else:
+            return False
     # poll peer sockets and do stuff if there is data
     def run(self): 
-        events=self.poller.poll()
+
+        # process any messages
+        result=self._recv_msg()
 
         #broadcast tx 
         active_peer_list=[peer for peer in self.fileno_to_peer_dict.values() if peer.get_is_active()]
@@ -105,7 +159,9 @@ class PeerSocketsHandler(object):
 
         # remove tx after we broadcast NUM_TX_BROADCASTS times
         self.tx_broadcast_list=[x for x in self.tx_broadcast_list if x[1] < self.num_tx_broadcasts]
-                  
+        
+        # check received packets
+        events=self.poller.poll()
         for event in events:
             poll_result=event[1]
             fileno=event[0]
@@ -133,8 +189,6 @@ class PeerSocketsHandler(object):
                     if address not in self.address_to_peer_dict:
                         if self.get_num_peers() < self.max_peers: 
                             self.create_peer_socket(address)
-                    else:
-                        print("found already connected peer")
                 #check new tx and add to db, Currently this does nothing  
                 while len(current_peer.tx_hash_list) > 0 :
                     tx_hash=current_peer.tx_hash_list.pop()
@@ -243,7 +297,7 @@ class PeerSocket(object):
     def verify_connection(self):
         data = struct.pack('<Q',NONCE)
         self._send_packet('ping',data)
-        data=self.my_socket.recv(1024)
+        data=self.my_socket.recv(TCP_RECV_PACKET_SIZE)
         
         return process_pong(data)
 
@@ -256,7 +310,7 @@ class PeerSocket(object):
         packet = struct.pack ('<4s12sII',
             self.msg_magic_bytes,cmd,len(payload),checksum) + payload
         try:
-            self.my_socket.send (packet)
+            self.my_socket.send(packet)
         except IOError as e:
             print("Send packet I/O error({0}): {1}".format(e.errno, e.strerror))
             return False
@@ -341,6 +395,8 @@ class PeerSocket(object):
             pass
         elif protocol.compare_command(data,"ping"):#query if tcp ip is alive
             pass
+        elif protocol.compare_command(data,"reject"): 
+            pass
         else:
             print("unhandled command recieved:",protocol.get_command_msgheader(data))
 
@@ -359,9 +415,6 @@ class PeerSocket(object):
                 pass
             elif(inv_type==1):#tx
                 tx_hash=''.join(inv_hash) #convert tuple to string
-                print("type inv_hash",type(inv_hash))
-                print("type tx_hash",type(tx_hash))
-                print("getdata received for tx hash:{}".format(tx_hash))
                 self._send_tx(tx_hash)
             elif(inv_type==2):#block
                 pass 
@@ -382,7 +435,6 @@ class PeerSocket(object):
             ipv6= struct.unpack('16c',ip_data[begin_index+12:begin_index+28])[0]
             ipv4= struct.unpack('4c',ip_data[begin_index+24:begin_index+28])[0]
             port=struct.unpack('!H',ip_data[begin_index+28:begin_index+30])[0]
-            print("recieved address:", socket.inet_ntop(socket.AF_INET,ip_data[begin_index+24:begin_index+28]))    
             self.peer_address_list.append(socket.inet_ntop(socket.AF_INET,ip_data[begin_index+24:begin_index+28])) 
 
     def _process_inv(self,data):
