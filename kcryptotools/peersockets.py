@@ -71,7 +71,7 @@ class PeerSocketsHandler(object):
         # setup messaging socket 
         self.msg_socket= socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.msg_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.msg_socket.bind(('localhost',MESSAGING_PORT))
+        self.msg_socket.bind(('localhost',cryptoconfig.MESSAGING_PORT[self.crypto]))
         self.msg_socket.listen(5)
         self.msg_socket.settimeout(0) # non blocking
         self.msg_recv_buffer=''

@@ -14,3 +14,5 @@ DNS_SEEDS           = {'bitcoin' : ['dnsseed.bluematt.me','bitseed.xf2.org','see
                        'dogecoin': ["seed.dogecoin.com","seed.mophides.com","seed.dglibrary.org","seed.dogechain.info"]
                       }
 TX_FEE_PER_KILOBYTE = {'bitcoin':10000, 'litecoin':100000 , 'dogecoin':100000000 }
+
+MESSAGING_PORT      = {'bitcoin':1944,'litecoin':1945,'dogecoin':1946}

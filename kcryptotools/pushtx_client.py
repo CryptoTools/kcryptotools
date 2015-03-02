@@ -2,12 +2,13 @@
 #
 # USAGE:
 #
-# python pusthx_client.py <tx hex>
+# python pusthx_client.py <crypto> <tx hex>
 
 import sys
 import json
 import socket
 
+import cryptoconfig
 import peersockets
 import pushtx_server
 import pushtx_server_config
@@ -30,9 +31,9 @@ def _communicate(ip,port,msg,recv_buffer_size):
     s.close()
     return out
 
-def pushtx(tx):
+def pushtx(crypto,tx):
     send_msg='tx '+tx
-    recvmsg=_communicate(SERVER_IP,peersockets.MESSAGING_PORT,send_msg,BUFFER_SIZE)
+    recvmsg=_communicate(SERVER_IP,cryptoconfig.MESSAGING_PORT[crypto],send_msg,BUFFER_SIZE)
 
     if recvmsg=='ack':
         return True
@@ -41,9 +42,11 @@ def pushtx(tx):
         return False
 
 def main():
-    if len(sys.argv) < 2: 
+    if len(sys.argv) < 3: 
         raise Exception('invalid arguments')
-    out=pushtx(sys.argv[1])
+    crypto=sys.argv[1]
+    tx=sys.argv[2]
+    out=pushtx(crypto,tx)
     if out==False:
         print("Pushtx failed.")
     else:
