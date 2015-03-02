@@ -49,7 +49,12 @@ class PeerSocketsHandler(object):
     def __init__(self,crypto,tx_broadcast_list=[],max_peers=DEFAULT_MAX_PEERS,
                     num_tx_broadcasts=DEFAULT_NUM_TX_BROADCASTS):
 
-        logging.basicConfig(filename=LOG_FILENAME, level=logging.INFO)
+        if crypto not in cryptoconfig.SUPPORTED_CRYPTOS:
+            raise Exception("Unsupported crypto {}".format(crypto))
+ 
+        logging.basicConfig(filename=LOG_FILENAME, level=logging.INFO,
+            format="%(asctime)s; %(levelname)s; %(message)s")
+
         self.crypto=crypto
         self.max_peers=DEFAULT_MAX_PEERS
         self.num_tx_broadcasts=DEFAULT_NUM_TX_BROADCASTS
@@ -268,12 +273,12 @@ class PeerSocket(object):
                 self.total_junk_bytes_received+=len(self.recv_buffer)
                 self.expected_msg_size=0
                 self.recv_buffer=''
-                logging.warn('Invalid command {} found'.format( protocol.get_command_msgheader(self.recv_buffer)))
+                logging.error('Invalid command found in buffer: {}'.format(self.recv_buffer))
                 return '' 
         try:
             self.recv_buffer+=self.my_socket.recv(TCP_RECV_PACKET_SIZE)
         except IOError as e:
-            logging.warn("I/O error({0}): {1}".format(e.errno, e.strerror))
+            logging.warn("Get packet from {0} I/O error({1}): {2}".format(self.address,e.errno, e.strerror))
             return ''  
 
         #if entire message is assembled exactly, return it

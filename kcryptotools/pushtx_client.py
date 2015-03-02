@@ -12,6 +12,10 @@ import peersockets
 import pushtx_server
 import pushtx_server_config
 
+SERVER_IP='localhost'
+BUFFER_SIZE=500000
+
+
 def _initclient(ip,port):
     s=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -28,7 +32,7 @@ def _communicate(ip,port,msg,recv_buffer_size):
 
 def pushtx(tx):
     send_msg='tx '+tx
-    recvmsg=_communicate(pushtx_server_config.SERVER_IP,peersockets.MESSAGING_PORT,send_msg,pushtx_server_config.BUFFER_SIZE)
+    recvmsg=_communicate(SERVER_IP,peersockets.MESSAGING_PORT,send_msg,BUFFER_SIZE)
 
     if recvmsg=='ack':
         return True

@@ -5,9 +5,9 @@ INTRODUCTION:
 
 kcryptotools is a collection of python programs designed to connect to a crypto network, talk to peers, and gather information. It is designed to work with Bitcoin and any closely related forks. Curently it supports Bitcoin, Litecoin, and Dogecoin. 
 
-It is not a full node, as it does not have any knowledge regarding the blockchain. Some of the code in protocol.py is taken from Caesure by Sam Rushing (https://github.com/samrushing/caesure). This software is a work in progress...
+It is not a full node, as it does not have any knowledge regarding the blockchain. Some of the code in protocol.py is taken from Caesure by Sam Rushing (https://github.com/samrushing/caesure). This software is in alpha and should not be used for production. 
 
-Coded with Python 2.7 and tested with Ubuntu 12.04 
+Coded with Python 2.7 and tested with Ubuntu 12.04/14.04. No support for Python 3 yet.  
 
 CURRENT FEATURES:
 
@@ -26,7 +26,5 @@ Please submit any issues you find at https://github.com/kaykurokawa/kcryptotools
 
 TODO LIST: 
 
-Add functionality to be able to add new tx while running peersockets  
-
-
+Python 3 support 
 
