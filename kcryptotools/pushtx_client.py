@@ -11,13 +11,9 @@ import socket
 import cryptoconfig
 import peersockets
 import pushtx_server
-import pushtx_server_config
 
 SERVER_IP='localhost'
 BUFFER_SIZE=500000
-CRYPTO_MAP={'btc':'bitcoin','btc_testnet':'bitcoin_testnet','ltc':'litecoin','ltc_testnet':'litecoin_testnet',
-    'doge':'dogecoin','doge_testnet':'dogecoin_testnet'}
-
 
 def _initclient(ip,port):
     s=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
@@ -35,8 +31,8 @@ def _communicate(ip,port,msg,recv_buffer_size):
 
 def pushtx(crypto,tx):
     crypto=crypto.lower()
-    if crypto in CRYPTO_MAP:
-        crypto=CRYPTO_MAP[crypto] 
+    if crypto in pushtx_server.CRYPTO_MAP:
+        crypto=pushtx_server.CRYPTO_MAP[crypto] 
 
     send_msg='tx '+tx
     recvmsg=_communicate(SERVER_IP,cryptoconfig.MESSAGING_PORT[crypto],send_msg,BUFFER_SIZE)

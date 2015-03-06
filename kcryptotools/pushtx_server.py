@@ -10,13 +10,19 @@ import struct
 
 import cryptoconfig
 import peersockets
-import pushtx_server_config
-  
+ 
+CRYPTO_MAP={'btc':'bitcoin','btc_testnet':'bitcoin_testnet','ltc':'litecoin','ltc_testnet':'litecoin_testnet',
+    'doge':'dogecoin','doge_testnet':'dogecoin_testnet'}
+
+
 def main():
     if len(sys.argv) < 2:
         raise Exception("invalid arguments, requires crypto as argument")
 
     crypto = sys.argv[1].lower()
+    if crypto in CRYPTO_MAP:
+        crypto=CRYPTO_MAP[crypto] 
+
     handler=peersockets.PeerSocketsHandler(crypto)
     while 1:
         handler.run()
